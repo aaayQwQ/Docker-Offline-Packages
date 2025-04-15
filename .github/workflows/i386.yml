@@ -1,44 +1,50 @@
-name: i386 Pull and Save Docker Image
+name: x86-32 Pull and Save Docker Image
 on:
   workflow_dispatch:
     inputs:
       docker_images:
-        description: '请输入 Docker 镜像名称，多个镜像用英文逗号分隔'
+        description: '请填写docker镜像名称，多个镜像用英文逗号分开'
         required: true
         default: 'alpine:latest'  # 设置默认的 Docker 镜像列表
 
 jobs:
   pull_and_package:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # 在 ubuntu 系统上运行
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v4  # 检出代码仓库
 
     - name: Clean up Docker to free space
       run: |
-          docker system prune -a -f
-          docker volume prune -f
+        docker system prune -a -f  # 清理 Docker
+        docker volume prune -f  # 清理 Docker 卷
 
     - name: Pull Docker Images and Package
       run: |
-        images="${{ github.event.inputs.docker_images }}"
-        IFS=',' read -r -a image_array <<< "$images"
+        images="${{ github.event.inputs.docker_images }}"  # 获取输入的 Docker 镜像
+        IFS=',' read -r -a image_array <<< "$images"  # 按逗号分割多个镜像
         for image in "${image_array[@]}"; do
+          # 拉取指定平台的 Docker 镜像，这里指定的是 32 位 (386)
           docker pull "${image}" --platform "linux/386"
-          docker save "${image}" -o "${image//\//_}-i386.tar"
+          
+          # 保存拉取的镜像为 .tar 文件，替换镜像名称中的 "/" 为 "_"，以确保文件名有效
+          docker save "${image}" -o "${image//\//_}-386.tar"
         done
 
     - name: Compress the TAR files
-      run: tar -czf i386-images.tar.gz *-i386.tar
+      run: |
+        # 将所有 32 位镜像 tar 文件打包成一个压缩包
+        tar -czf x86-32-images.tar.gz *-386.tar
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v4  # 上传压缩包作为构件
       with:
-        name: docker-images-tar-i386
-        path: i386-images.tar.gz
-        retention-days: 1  # 设置保留天数为 1 天，最多可设置 90 天
+        name: docker-images-tar
+        path: x86-32-images.tar.gz
+        retention-days: 1  # 保留 1 天
 
     - name: Clean up intermediate files
       run: |
-        rm *-i386.tar
+        # 清理中间生成的 32 位 tar 文件
+        rm *-386.tar
