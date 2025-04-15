@@ -3,48 +3,42 @@ on:
   workflow_dispatch:
     inputs:
       docker_images:
-        description: '请填写docker镜像名称，多个镜像用英文逗号分开'
+        description: '请填写docker镜像名称 多个用英文逗号分开'
         required: true
         default: 'alpine:latest'  # 设置默认的 Docker 镜像列表
 
 jobs:
   pull_and_package:
-    runs-on: ubuntu-latest  # 在 ubuntu 系统上运行
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4  # 检出代码仓库
+      uses: actions/checkout@v4
 
     - name: Clean up Docker to free space
       run: |
-        docker system prune -a -f  # 清理 Docker
-        docker volume prune -f  # 清理 Docker 卷
+          docker system prune -a -f
+          docker volume prune -f
 
     - name: Pull Docker Images and Package
       run: |
-        images="${{ github.event.inputs.docker_images }}"  # 获取输入的 Docker 镜像
-        IFS=',' read -r -a image_array <<< "$images"  # 按逗号分割多个镜像
+        images="${{ github.event.inputs.docker_images }}"
+        IFS=',' read -r -a image_array <<< "$images"
         for image in "${image_array[@]}"; do
-          # 拉取指定平台的 Docker 镜像，这里指定的是 32 位 (386)
-          docker pull "${image}" --platform "linux/386"
-          
-          # 保存拉取的镜像为 .tar 文件，替换镜像名称中的 "/" 为 "_"，以确保文件名有效
-          docker save "${image}" -o "${image//\//_}-386.tar"
+          docker pull "${image}" --platform "linux/386"  # Use linux/386 for 32-bit
+          docker save "${image}" -o "${image//\//_}-x86.tar"  # Save with -x86 suffix
         done
 
     - name: Compress the TAR files
-      run: |
-        # 将所有 32 位镜像 tar 文件打包成一个压缩包
-        tar -czf x86-32-images.tar.gz *-386.tar
+      run: tar -czf x86-32-images.tar.gz *-x86.tar  # Ensure the tarball is for 32-bit images
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v4  # 上传压缩包作为构件
+      uses: actions/upload-artifact@v4
       with:
         name: docker-images-tar
-        path: x86-32-images.tar.gz
-        retention-days: 1  # 保留 1 天
+        path: x86-32-images.tar.gz  # Correct artifact name for 32-bit images
+        retention-days: 1  # 将保留天数设置为 1 天 最多可设置90天
 
     - name: Clean up intermediate files
       run: |
-        # 清理中间生成的 32 位 tar 文件
-        rm *-386.tar
+        rm *-x86.tar  # Remove the 32-bit tar files after use
